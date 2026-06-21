@@ -1,127 +1,262 @@
 #!/usr/bin/env bash
 
 # ==============================================================================
-# Unified Installation Script for bpm.sh (Bash Plugin Manager)
+# bpm.sh - High-Performance, Unified Bash Plugin Manager
 # ==============================================================================
 
 set -euo pipefail
 
-# Configuration Environment Defaults
-TARGET_DIR="${BPM_DIR:-$HOME/.local/share/bpm}"
-PLUGINS_DIR="$TARGET_DIR/plugins"
-# Replace with your actual username/repository for remote deployment:
-SCRIPT_URL="https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/bpm.sh"
+# Configuration
+BPM_DIR="${BPM_DIR:-$HOME/.local/share/bpm}"
+BPM_PLUGINS_DIR="$BPM_DIR/plugins"
+mkdir -p "$BPM_PLUGINS_DIR"
 
-# ANSI Terminal Coloring
+# Formatting Colors
 RED='\033[0;31m'    GREEN='\033[0;32m'
 YELLOW='\033[0;33m' BLUE='\033[0;34m'
 BOLD='\033[1m'      NC='\033[0m'
 
-_info()    { echo -e "${BLUE}${BOLD}[BPM-INSTALL]${NC} $1"; }
-_success() { echo -e "${GREEN}${BOLD}[BPM-INSTALL]✓${NC} $1"; }
-_warn()    { echo -e "${YELLOW}${BOLD}[BPM-INSTALL]!${NC} $1"; }
-_error()   { echo -e "${RED}${BOLD}[BPM-INSTALL]✗ Error:${NC} $1" >&2; exit 1; }
+_info()    { echo -e "${BLUE}${BOLD}[BPM]${NC} $1"; }
+_success() { echo -e "${GREEN}${BOLD}[BPM]✓${NC} $1"; }
+_warn()    { echo -e "${YELLOW}${BOLD}[BPM]!${NC} $1"; }
+_error()   { echo -e "${RED}${BOLD}[BPM]✗ Error:${NC} $1" >&2; }
 
-# --- Pre-flight Dependency Analysis ---
-_info "Analyzing environment capabilities..."
-if ! command -v git &>/dev/null; then
-    _error "git is an absolute runtime requirement. Please install git and retry."
-fi
+_usage() {
+    cat << EOF
+bpm.sh - Advanced Bash Plugin Manager
 
-# Locate appropriate shell interactive profile
-RC_FILE=""
-if [[ -f "$HOME/.bashrc" ]]; then
-    RC_FILE="$HOME/.bashrc"
-elif [[ -f "$HOME/.bash_profile" ]]; then
-    RC_FILE="$HOME/.bash_profile"
-else
-    _warn "Could not explicitly map standard shell profile locations (~/.bashrc or ~/.bash_profile)."
-    read -rp "Please manually specify your target shell config path: " RC_FILE
-fi
+Usage:
+  bpm.sh load <repo> [options]  - Install and source a plugin
+  bpm.sh init-ble               - Pre-initialize ble.sh (if installed)
+  bpm.sh finalize-ble           - Attach ble.sh terminal engine
+  bpm.sh update [<repo>]        - Update plugins in parallel (or a specific repo)
+  bpm.sh list                   - List active plugins and versions
+  bpm.sh clean                  - Prune unused files and optimize repositories
+  bpm.sh ui                     - Launch interactive management dashboard
+  bpm.sh self-update            - Upgrade bpm.sh framework to the latest version
 
-# --- Target Directory Generation ---
-_info "Generating safe asset path routing at: $TARGET_DIR"
-mkdir -p "$PLUGINS_DIR"
-
-# --- Code Asset Resolution ---
-if [[ "$SCRIPT_URL" != *"YOUR_USERNAME"* ]]; then
-    _info "Fetching runtime platform from remote master cluster..."
-    if ! curl -fsSL "$SCRIPT_URL" -o "$TARGET_DIR/bpm.sh"; then
-        _error "Failed to cleanly stream remote codebase asset."
-    fi
-else
-    # Development/Local Fallback
-    if [[ -f "./bpm.sh" ]]; then
-        _info "Deploying adjacent local developer platform asset to production runtime target..."
-        cp "./bpm.sh" "$TARGET_DIR/bpm.sh"
-    else
-        _error "No local 'bpm.sh' found, and SCRIPT_URL has not been provisioned."
-    fi
-fi
-
-chmod +x "$TARGET_DIR/bpm.sh"
-
-# --- Shell Integration Injection Engine ---
-_info "Configuring active execution layers inside: $RC_FILE"
-
-BLOCK_MARKER="# === UNIFIED BPM CORE ARCHITECTURE BLOCK ==="
-CONFIG_INJECTION=$(cat << 'EOF'
-# === UNIFIED BPM CORE ARCHITECTURE BLOCK ===
-bpm() {
-    case "$1" in
-        load)                 source "$HOME/.local/share/bpm/bpm.sh" "$@" ;;
-        init-ble|finalize-ble) source "$HOME/.local/share/bpm/bpm.sh" "$1" ;;
-        *)                    "$HOME/.local/share/bpm/bpm.sh" "$@" ;;
-    esac
-}
-
-# 1. Bootstraps Ble.sh Line Editor hooks immediately (safe if not yet installed)
-bpm init-ble
-
-# --- [USER PLUGINS CONTAINER] ---
-# bpm load "bash-users/bash-completion"
-# --------------------------------
-
-# 2. Closes and anchors the graphic input terminal interfaces
-# This specific instruction MUST remain the final entry of your shell configuration
-bpm finalize-ble
-
-# Native Shell tab Auto-Completions
-_bpm_completion() {
-    local cur prev opts
-    COMPREPLY=()
-    cur="${COMP_WORDS[COMP_CWORD]}"
-    prev="${COMP_WORDS[COMP_CWORD-1]}"
-    opts="load update list clean ui self-update help"
-
-    case "$prev" in
-        load)
-            [[ "$cur" == -* ]] && COMPREPLY=( $(compgen -W "--use --on --branch" -- "$cur") )
-            return 0 ;;
-        update)
-            local plugins; plugins=$(command ls "$HOME/.local/share/bpm/plugins" 2>/dev/null)
-            COMPREPLY=( $(compgen -W "$plugins" -- "$cur") )
-            return 0 ;;
-    esac
-    [[ $COMP_CWORD -eq 1 ]] && COMPREPLY=( $(compgen -W "$opts" -- "$cur") )
-}
-complete -F _bpm_completion bpm
-# ============================================
+Options for 'load':
+  --use <filename>              - Explicitly target this file to source
+  --on <command>                - Run a post-install compilation hook
+  --branch <name>               - Target a specific branch, tag, or commit
 EOF
-)
+}
 
-# Atomic matching validation to maintain single instance blocks
-if grep -qF "$BLOCK_MARKER" "$RC_FILE" 2>/dev/null; then
-    _warn "An active bpm architecture block was already recognized inside $RC_FILE."
-    _info "Skipping auto-injection to guard existing custom configurations."
-else
-    echo -e "\n$CONFIG_INJECTION" >> "$RC_FILE"
-    _success "Successfully linked unified manager environment."
-fi
+# --- Helper Functions ---
 
-# --- Compilation Output Block ---
-echo -e "\n----------------------------------------------------------------"
-_success "${BOLD}The Unified Bash Plugin Manager is ready!${NC}"
-_info "Initialize your shell context to begin using bpm:"
-echo -e "  ${BOLD}source $RC_FILE${NC}"
-echo -e "----------------------------------------------------------------\n"
+_get_plugin_dir() {
+    local repo="$1"
+    if [[ "$repo" == /* || "$repo" == .* ]]; then
+        realpath "$repo"
+    else
+        echo "$BPM_PLUGINS_DIR/${repo#*/}"
+    fi
+}
+
+_find_entry_point() {
+    local dir="$1" custom_use="$2"
+    if [[ -n "$custom_use" && -f "$dir/$custom_use" ]]; then
+        echo "$dir/$custom_use"; return
+    fi
+    
+    local name; name=$(basename "$dir")
+    local candidates=(
+        "$dir/$name.plugin.bash" "$dir/$name.bash" "$dir/$name.sh" 
+        "$dir/init.bash" "$dir/init.sh" "$dir/plugin.bash"
+    )
+    for c in "${candidates[@]}"; do
+        [[ -f "$c" ]] && { echo "$c"; return; }
+    done
+    find "$dir" -maxdepth 1 \( -name "*.plugin.bash" -o -name "*.bash" -o -name "*.sh" \) -print -quit
+}
+
+# --- Core Commands ---
+
+bpm_load() {
+    local repo="" use_file="" hook="" branch=""
+    
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --use)    use_file="$2"; shift 2 ;;
+            --on)     hook="$2";     shift 2 ;;
+            --branch) branch="$2";   shift 2 ;;
+            -*)       _error "Unknown option $1"; return 1 ;;
+            *)        repo="$1";     shift ;;
+        esac
+    done
+
+    [[ -z "$repo" ]] && { _error "No repository specified."; return 1; }
+    
+    local dest; dest=$(_get_plugin_dir "$repo")
+
+    # Clone repository if it doesn't exist locally
+    if [[ ! -d "$dest" ]]; then
+        _info "Cloning $repo..."
+        local branch_flag=()
+        [[ -n "$branch" ]] && branch_flag=(--branch "$branch")
+        
+        if ! git clone --depth 1 "${branch_flag[@]}" "https://github.com/$repo.git" "$dest" &>/dev/null; then
+            _error "Failed cloning $repo"
+            return 1
+        fi
+        
+        if [[ -n "$hook" ]]; then
+            _info "Running post-install hook for $repo..."
+            (cd "$dest" && eval "$hook") || _warn "Hook failed for $repo"
+        fi
+        _success "Loaded $repo"
+    fi
+
+    # Source into environment safely
+    local entry; entry=$(_find_entry_point "$dest" "$use_file")
+    if [[ -n "$entry" ]]; then
+        source "$entry" || _warn "Failed sourcing $entry"
+    else
+        _warn "Could not resolve valid shell entry file in $repo"
+    fi
+}
+
+bpm_ensure_blesh() {
+    local ble_dir="$BPM_PLUGINS_DIR/ble.sh"
+    
+    if [[ ! -d "$ble_dir" ]]; then
+        _info "Installing ble.sh (compiling framework, please wait)..."
+        local tmp_clone; tmp_clone=$(mktemp -d)
+        if git clone --depth 1 --recursive https://github.com/akinomyoga/ble.sh.git "$tmp_clone" &>/dev/null; then
+            (cd "$tmp_clone" && make &>/dev/null && make install INSDIR="$ble_dir" &>/dev/null)
+            _success "ble.sh compiled successfully."
+        else
+            _error "Failed to clone ble.sh repository."
+        fi
+        rm -rf "$tmp_clone"
+    fi
+
+    [[ $- != *i* ]] && return # Exit if shell is non-interactive
+    if [[ -f "$ble_dir/share/ble/ble.sh" ]] && ! type ble-attach &>/dev/null; then
+        source "$ble_dir/share/ble/ble.sh" --noattach
+    fi
+}
+
+bpm_finalize_ble() {
+    if type ble-attach &>/dev/null; then
+        ble-attach
+    fi
+}
+
+bpm_update() {
+    local target="${1:-}"
+    
+    _update_dir() {
+        local dir="$1"
+        (
+            cd "$dir"
+            local old_rev; old_rev=$(git rev-parse HEAD)
+            git fetch --depth 1 origin &>/dev/null
+            git reset --hard origin/$(git branch --show-current 2>/dev/null || echo "main") &>/dev/null
+            if [[ "$old_rev" != "$(git rev-parse HEAD)" ]]; then
+                echo -e "${GREEN}Updated $(basename "$dir")${NC}"
+            fi
+        )
+    }
+
+    if [[ -n "$target" ]]; then
+        local dest; dest=$(_get_plugin_dir "$target")
+        [[ -d "$dest/.git" ]] && _update_dir "$dest" || _error "Plugin '$target' not found or not a git repo."
+    else
+        _info "Updating all plugins concurrently..."
+        local pids=()
+        for d in "$BPM_PLUGINS_DIR"/*; do
+            if [[ -d "$d" && -d "$d/.git" ]]; then
+                _update_dir "$d" & pids+=($!)
+            fi
+        done
+        for pid in "${pids[@]}"; do wait "$pid"; done
+        _success "All updates completed."
+    fi
+}
+
+bpm_clean() {
+    _info "Optimizing plugins and clearing garbage..."
+    for d in "$BPM_PLUGINS_DIR"/*; do
+        if [[ -d "$d/.git" ]]; then
+            git -C "$d" gc --prune=now &>/dev/null &
+        fi
+    done
+    wait
+    _success "Optimization complete."
+}
+
+bpm_list() {
+    echo -e "${BOLD}Managed Plugins:${NC}"
+    for d in "$BPM_PLUGINS_DIR"/*; do
+        if [[ -d "$d" ]]; then
+            local branch; branch=$(git -C "$d" branch --show-current 2>/dev/null || echo "local/custom")
+            echo -e "  ${BLUE}*${NC} $(basename "$d") [branch: $branch]"
+        fi
+    done
+}
+
+bpm_ui() {
+    if ! command -v dialog &>/dev/null; then
+        _warn "'dialog' utility not found. Falling back to clean shell-select prompt..."
+        echo -e "${BOLD}Select a plugin to remove (or 'q' to quit):${NC}"
+        select opt in $(command ls "$BPM_PLUGINS_DIR"); do
+            [[ "$opt" == "q" || -z "$opt" ]] && break
+            read -rp "Uninstall $opt? (y/N): " confirm
+            [[ "$confirm" =~ ^[Yy]$ ]] && rm -rf "$BPM_PLUGINS_DIR/$opt" && _success "Removed $opt"
+            break
+        done
+        return
+    fi
+
+    local tempfile; tempfile=$(mktemp)
+    local choices=()
+    for d in "$BPM_PLUGINS_DIR"/*; do
+        [[ -d "$d" ]] && choices+=("$(basename "$d")" "Plugin Active" "ON")
+    done
+
+    if [[ ${#choices[@]} -eq 0 ]]; then
+        dialog --title " BPM " --msgbox "No active plugins installed." 6 40
+        return
+    fi
+
+    if dialog --title " Interactive BPM Engine " --checklist "Spacebar to uncheck/delete. Enter to execute:" 15 50 8 "${choices[@]}" 2> "$tempfile"; then
+        local selected; selected=$(cat "$tempfile")
+        for d in "$BPM_PLUGINS_DIR"/*; do
+            if [[ -d "$d" ]]; then
+                local name; name=$(basename "$d")
+                if [[ "$selected" != *"$name"* ]]; then
+                    rm -rf "$d" && _info "Pruned $name"
+                fi
+            fi
+        done
+        _success "Modifications successfully synced."
+    fi
+    rm -f "$tempfile"; clear
+}
+
+bpm_self_update() {
+    _info "Reaching out for raw core updates..."
+    local remote_url="https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/bpm.sh"
+    local tmp; tmp=$(mktemp)
+    if curl -fsSL "$remote_url" -o "$tmp" && grep -q "BPM_PLUGINS_DIR" "$tmp"; then
+        cp "$tmp" "$BPM_DIR/bpm.sh" && chmod +x "$BPM_DIR/bpm.sh"
+        _success "bpm.sh platform upgraded flawlessly."
+    else
+        _error "Core verification down or invalid endpoint asset."
+    fi
+    rm -f "$tmp"
+}
+
+# --- Execution Router ---
+case "${1:-}" in
+    load)         shift; bpm_load "$@" ;;
+    init-ble)     bpm_ensure_blesh ;;
+    finalize-ble) bpm_finalize_ble ;;
+    update)       shift; bpm_update "${1:-}" ;;
+    list)         bpm_list ;;
+    clean)        bpm_clean ;;
+    ui)           bpm_ui ;;
+    self-update)  bpm_self_update ;;
+    *)            _usage ;;
+esac
